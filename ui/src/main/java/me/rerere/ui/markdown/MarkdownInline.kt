@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -40,19 +42,22 @@ internal fun InlineText(content: List<MarkdownInline>, modifier: Modifier = Modi
     val style = LocalTextStyle.current
     val density = LocalDensity.current
     val contentColor = style.color.takeOrElse { LocalContentColor.current }
-    val rendered = remember(content, context, style, density, contentColor) {
-        InlineTextBuilder(context, MarkdownInlineScope(style, density, contentColor)).build(content)
+    val sources = LocalMathCopySourceMap.current
+    val rendered = remember(content, context, style, density, contentColor, sources) {
+        InlineTextBuilder(context, MarkdownInlineScope(style, density, contentColor), sources).build(content)
     }
     Text(
         text = rendered.text,
-        modifier = modifier,
+        modifier = if (sources == null) modifier else modifier.semantics {
+            this.text = AnnotatedString(sources.restore(rendered.text.text))
+        },
         inlineContent = rendered.inlineContent,
         // 行内公式可能比一行文字高，固定行高会让它和上下行叠在一起
         style = if (rendered.hasMathWidget) style.copy(lineHeight = TextUnit.Unspecified) else style,
     )
 }
 
-private class RenderedInlineText(
+internal class RenderedInlineText(
     val text: AnnotatedString,
     val inlineContent: Map<String, InlineTextContent>,
     val hasMathWidget: Boolean,
@@ -63,9 +68,10 @@ private val MATH_SOURCE_STYLE = SpanStyle(fontFamily = FontFamily.Monospace)
 // 开引号 -> 闭引号。单引号常被当作撇号（don't、it’s）使用，不参与配对
 private val QUOTE_PAIRS = mapOf('"' to '"', '“' to '”', '「' to '」', '『' to '』')
 
-private class InlineTextBuilder(
+internal class InlineTextBuilder(
     private val context: MarkdownContext,
     private val scope: MarkdownInlineScope,
+    private val sources: MathCopySourceMap? = null,
 ) {
     private val builder = AnnotatedString.Builder()
     private val inlineContent = mutableMapOf<String, InlineTextContent>()
@@ -133,11 +139,22 @@ private class InlineTextBuilder(
             builder.withStyle(MATH_SOURCE_STYLE) { append(math.copySource()) }
             return
         }
+        val token = sources?.register(math.copySource())
+        val continuationToken = if (sources != null && widgets.size > 1) sources.register("") else null
+        if (sources != null && (token == null || (widgets.size > 1 && continuationToken == null))) {
+            builder.withStyle(MATH_SOURCE_STYLE) { append(math.copySource()) }
+            return
+        }
         hasMathWidget = true
         widgets.forEachIndexed { index, widget ->
-            // 零宽空格给拆开的公式提供换行点
-            if (index > 0) builder.append('​')
-            appendWidget(widget, alternateText = math.copySource())
+            if (sources != null) {
+                // Subsequent visual fragments copy nothing; the first owns the source.
+                val fragmentToken = if (index == 0) token else continuationToken
+                appendWidget(widget, alternateText = fragmentToken.toString())
+            } else {
+                if (index > 0) builder.append('​')
+                appendWidget(widget, alternateText = math.copySource())
+            }
         }
     }
 

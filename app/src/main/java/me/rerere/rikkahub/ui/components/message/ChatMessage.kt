@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import me.rerere.ui.markdown.MarkdownSelectionContainer
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -374,6 +374,11 @@ private fun MessagePartsBlock(
             is MessagePartBlock.ContentBlock -> key(block.index) {
                 when (val part = block.part) {
                     is UIMessagePart.Text -> {
+                        val displayedText = part.text.replaceRegexes(
+                            assistant = assistant,
+                            scope = if (role == MessageRole.USER) AssistantAffectScope.USER else AssistantAffectScope.ASSISTANT,
+                            visual = true,
+                        )
                         val textContent = @Composable {
                             if (role == MessageRole.USER) {
                                 ChatMessageBubble(
@@ -386,11 +391,7 @@ private fun MessagePartsBlock(
                                         .animateContentSize(),
                                 ) {
                                     MarkdownBlock(
-                                        content = part.text.replaceRegexes(
-                                            assistant = assistant,
-                                            scope = AssistantAffectScope.USER,
-                                            visual = true,
-                                        ),
+                                        content = displayedText,
                                         isStreaming = loading,
                                         onClickCitation = handleClickCitation
                                     )
@@ -403,22 +404,14 @@ private fun MessagePartsBlock(
                                         modifier = Modifier.animateContentSize(),
                                     ) {
                                         MarkdownBlock(
-                                            content = part.text.replaceRegexes(
-                                                assistant = assistant,
-                                                scope = AssistantAffectScope.ASSISTANT,
-                                                visual = true,
-                                            ),
+                                            content = displayedText,
                                             isStreaming = loading,
                                             onClickCitation = handleClickCitation,
                                         )
                                     }
                                 } else {
                                     MarkdownBlock(
-                                        content = part.text.replaceRegexes(
-                                            assistant = assistant,
-                                            scope = AssistantAffectScope.ASSISTANT,
-                                            visual = true,
-                                        ),
+                                        content = displayedText,
                                         isStreaming = loading,
                                         onClickCitation = handleClickCitation,
                                         modifier = Modifier
@@ -435,7 +428,7 @@ private fun MessagePartsBlock(
                         if (loading) {
                             textContent()
                         } else {
-                            SelectionContainer {
+                            MarkdownSelectionContainer(source = displayedText) {
                                 textContent()
                             }
                         }

@@ -126,7 +126,7 @@ private fun InlineContent(
 
     when (val single = segments.singleOrNull()) {
         is InlineSegment.Text -> InlineText(single.content, alignedModifier)
-        is InlineSegment.Math -> Box(modifier) { components.mathBlock(single.formula) }
+        is InlineSegment.Math -> SelectableMathBlock(MarkdownInline.Math(single.formula, true).copySource(), modifier) { components.mathBlock(single.formula) }
         else -> FlowRow(
             modifier = alignedModifier,
             horizontalArrangement = Arrangement.spacedBy(4.dp, textAlign.toHorizontalAlignment()),
@@ -137,7 +137,7 @@ private fun InlineContent(
                 when (segment) {
                     is InlineSegment.Text -> InlineText(segment.content)
                     is InlineSegment.Image -> components.image(segment.image, segment.link)
-                    is InlineSegment.Math -> Box(Modifier.fillMaxWidth()) { components.mathBlock(segment.formula) }
+                    is InlineSegment.Math -> SelectableMathBlock(MarkdownInline.Math(segment.formula, true).copySource(), Modifier.fillMaxWidth()) { components.mathBlock(segment.formula) }
                 }
             }
         }

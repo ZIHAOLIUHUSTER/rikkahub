@@ -8,7 +8,9 @@ Long-press an inline or display formula to copy LaTeX, including `$â€¦$` or `$$â
 
 The existing select-and-copy sheet defaults to the original message Markdown, unchanged. Switch to Plain text to select or copy text generated from the Markdown syntax tree; code and LaTeX remain intact. Existing whole-message copy and export actions remain available.
 
-Rendered selection uses Compose's inline alternate text for formulas. Arbitrary rendered selections do not yet map back to exact Markdown source spans; use the Markdown tab for exact source selection. Formula delimiter styles are canonicalized on formula-level copy; the Markdown tab preserves the original delimiters and whitespace.
+Rendered message selection now carries a formula source map. A formula is one selectable placeholder, restored to its complete LaTeX when copying; this includes display formulas drawn on Canvas and multiline expressions. Visual fragments do not duplicate the source or insert zero-width spaces. Ordinary literal text such as `[Latex]` is never guessed or rewritten. The wrapper supports both Compose clipboard APIs. Long-press still copies the complete formula; selecting individual symbols within the rendered formula is intentionally out of scope.
+
+Arbitrary rendered selections do not map back to exact Markdown formatting spans; use the Markdown tab for exact source selection. Formula delimiter styles are canonicalized on formula-level copy; the Markdown tab preserves the original delimiters and whitespace.
 
 ## HTML previews
 
