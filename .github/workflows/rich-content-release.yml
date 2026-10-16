@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -32,9 +32,19 @@ jobs:
           node-version: '22'
           cache: pnpm
           cache-dependency-path: web-ui/pnpm-lock.yaml
-      - uses: android-actions/setup-android@v3
       - name: Prepare Android SDK
-        run: sdkmanager 'platforms;android-37.0' 'platforms;android-37.2' 'build-tools;36.0.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+        run: |
+          sdk_path="$RUNNER_TEMP/rikkahub-android-sdk"
+          tools_zip="$RUNNER_TEMP/rikkahub-cmdline-tools.zip"
+          curl --fail --location --retry 3 https://dl.google.com/android/repository/commandlinetools-linux-16111833_latest.zip -o "$tools_zip"
+          echo "e025545c62a8e64c7559119566a569fb1dec5f60  $tools_zip" | sha1sum --check -
+          mkdir -p "$sdk_path/cmdline-tools"
+          unzip -q "$tools_zip" -d "$sdk_path/cmdline-tools"
+          mv "$sdk_path/cmdline-tools/cmdline-tools" "$sdk_path/cmdline-tools/latest"
+          "$sdk_path/cmdline-tools/latest/bin/android" --sdk="$sdk_path" sdk install 'platforms;android-37.0' 'platforms;android-37.2' 'build-tools;36.0.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1' platform-tools
+          echo "ANDROID_HOME=$sdk_path" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk_path" >> "$GITHUB_ENV"
+          echo "$sdk_path/platform-tools" >> "$GITHUB_PATH"
       - name: Install frontend dependencies
         working-directory: web-ui
         run: pnpm install --frozen-lockfile
