@@ -3,6 +3,8 @@ package me.rerere.rikkahub.ui.components.richtext
 import android.content.ClipData
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -203,42 +205,26 @@ private fun MarkdownInlineScope.inlineMathWidgets(formula: String): List<Markdow
     if (!fontSize.isSp) return emptyList()
     return with(density) {
         val fontSizePx = fontSize.toPx()
-        // 将过长的行内公式按顶层运算符水平拆分为多段，每段最大宽度限制为字号的两倍，
-        // 使其能在文本流中换行，避免单体公式超出可用宽度被挤出屏幕
-        val drawables = splitLatex(
-            latex = formula,
-            maxWidthPx = fontSizePx * 2,
-            fontSize = fontSizePx,
-            color = contentColor.toArgb(),
-        )
-        if (drawables.isNotEmpty()) {
-            drawables.map { drawable ->
-                MarkdownInlineWidget(
-                    placeholder = Placeholder(
-                        width = drawable.bounds.width().toSp(),
-                        height = drawable.bounds.height().toSp(),
-                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
-                    ),
-                ) {
-                    LatexDrawable(drawable = drawable)
-                }
+        // One source range per formula: repeating the full source for every visual
+        // fragment duplicates LaTeX when Compose copies a selection. Long formulas
+        // scroll inside a bounded placeholder rather than splitting their source.
+        val bounds = assumeLatexSize(latex = formula, fontSize = fontSizePx)
+        if (bounds.isEmpty) return emptyList()
+        listOf(
+            MarkdownInlineWidget(
+                placeholder = Placeholder(
+                    width = minOf(bounds.width().toFloat(), fontSizePx * 16).toSp(),
+                    height = bounds.height().toSp(),
+                    placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
+                ),
+            ) {
+                MathInline(
+                    latex = formula,
+                    fontSize = fontSize,
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                )
             }
-        } else {
-            // 拆分失败时回退为单体内联渲染；连尺寸都量不出来说明公式有误，交给组件显示公式源码
-            val bounds = assumeLatexSize(latex = formula, fontSize = fontSizePx)
-            if (bounds.isEmpty) return emptyList()
-            listOf(
-                MarkdownInlineWidget(
-                    placeholder = Placeholder(
-                        width = bounds.width().toSp(),
-                        height = bounds.height().toSp(),
-                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
-                    ),
-                ) {
-                    MathInline(latex = formula, fontSize = fontSize)
-                }
-            )
-        }
+        )
     }
 }
 

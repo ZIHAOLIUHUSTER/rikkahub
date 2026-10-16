@@ -130,14 +130,14 @@ private class InlineTextBuilder(
     private fun appendMath(math: MarkdownInline.Math) {
         val widgets = context.components.inlineMath?.invoke(scope, math.formula).orEmpty()
         if (widgets.isEmpty()) {
-            builder.withStyle(MATH_SOURCE_STYLE) { append(math.formula) }
+            builder.withStyle(MATH_SOURCE_STYLE) { append(math.copySource()) }
             return
         }
         hasMathWidget = true
         widgets.forEachIndexed { index, widget ->
             // 零宽空格给拆开的公式提供换行点
             if (index > 0) builder.append('​')
-            appendWidget(widget, alternateText = math.formula)
+            appendWidget(widget, alternateText = math.copySource())
         }
     }
 

@@ -1,5 +1,7 @@
 package me.rerere.rikkahub.ui.components.richtext
 
+import me.rerere.ui.markdown.MarkdownInline
+import me.rerere.ui.markdown.copySource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -23,6 +25,7 @@ fun MathInline(
     val proceededLatex = latex
     LatexText(
         latex = proceededLatex,
+        copySource = MarkdownInline.Math(latex).copySource(),
         color = LocalContentColor.current,
         fontSize = fontSize.takeOrElse { LocalTextStyle.current.fontSize },
         modifier = modifier,
@@ -41,6 +44,7 @@ fun MathBlock(
     ) {
         LatexText(
             latex = proceededLatex,
+            copySource = MarkdownInline.Math(latex, display = true).copySource(),
             color = LocalContentColor.current,
             fontSize = fontSize.takeOrElse { LocalTextStyle.current.fontSize },
             modifier = Modifier

@@ -21,20 +21,28 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import me.rerere.ui.markdown.parseMarkdown
+import me.rerere.ui.markdown.copyPlainText
+import me.rerere.rikkahub.utils.writeClipboardText
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEach
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.Copy01
 import me.rerere.rikkahub.R
-import me.rerere.rikkahub.utils.copyMessageToClipboard
 
 @Composable
 fun ChatMessageCopySheet(
@@ -42,6 +50,15 @@ fun ChatMessageCopySheet(
     onDismissRequest: () -> Unit
 ) {
     val context = LocalContext.current
+    var markdownMode by remember { mutableStateOf(true) }
+    val source = remember(message) {
+        message.toText()
+    }
+    val plainText by produceState<String?>(null, source) {
+        value = withContext(Dispatchers.Default) { parseMarkdown(source).copyPlainText() }
+    }
+    val selectedText = if (markdownMode) source else plainText
+
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)),
@@ -74,8 +91,9 @@ fun ChatMessageCopySheet(
                 )
 
                 TextButton(
+                    enabled = selectedText != null,
                     onClick = {
-                        context.copyMessageToClipboard(message)
+                        selectedText?.let { context.writeClipboardText(it) }
                         onDismissRequest()
                     }
                 ) {
@@ -89,6 +107,18 @@ fun ChatMessageCopySheet(
                 }
             }
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.FilterChip(
+                    selected = markdownMode,
+                    onClick = { markdownMode = true },
+                    label = { Text("Markdown") },
+                )
+                androidx.compose.material3.FilterChip(
+                    selected = !markdownMode,
+                    onClick = { markdownMode = false },
+                    label = { Text("Plain text") },
+                )
+            }
             // Content
             val textParts =
                 message.parts.filterIsInstance<UIMessagePart.Text>().filter { it.text.isNotBlank() }
@@ -117,12 +147,10 @@ fun ChatMessageCopySheet(
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
                     ) {
-                        textParts.fastForEach { textPart ->
-                            Text(
-                                text = textPart.text,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
+                        Text(
+                            text = selectedText.orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                 }
             }

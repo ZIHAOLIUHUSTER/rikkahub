@@ -1,6 +1,14 @@
 package me.rerere.rikkahub.ui.components.richtext
 
 import android.graphics.Rect
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.ClipEntry
+import android.content.ClipData
+import kotlinx.coroutines.launch
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalTextStyle
@@ -33,8 +41,17 @@ fun LatexText(
     modifier: Modifier = Modifier,
     fontSize: TextUnit = TextUnit.Unspecified,
     color: Color = Color.Unspecified,
-    style: TextStyle = LocalTextStyle.current
+    style: TextStyle = LocalTextStyle.current,
+    copySource: String = latex,
 ) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val copyLatex: () -> Unit = {
+        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("LaTeX", copySource))) }
+    }
+    val copyModifier = modifier
+        .combinedClickable(onClick = {}, onLongClickLabel = "Copy LaTeX", onLongClick = copyLatex)
+        .semantics { onLongClick("Copy LaTeX") { copyLatex(); true } }
     val style = style.merge(
         fontSize = fontSize,
         color = color
@@ -59,7 +76,7 @@ fun LatexText(
     if (drawable != null) {
         with(density) {
             Canvas(
-                modifier = modifier
+                modifier = copyModifier
                     .size(
                         width = drawable.bounds.width().toDp(),
                         height = drawable.bounds.height().toDp()
@@ -72,7 +89,7 @@ fun LatexText(
         Text(
             text = latex,
             style = style,
-            modifier = modifier
+            modifier = copyModifier
         )
     }
 }

@@ -215,3 +215,39 @@ private fun MarkdownInline.hasEmbedded(): Boolean = when (this) {
     is MarkdownInline.Link -> children.any { it.hasEmbedded() }
     else -> false
 }
+
+/** Copy formulas with delimiters; never pass source through rendering/escape replacements. */
+fun MarkdownInline.Math.copySource(): String =
+    if (display) "\$\$\n$formula\n\$\$" else "\$$formula\$"
+
+/** Plain text from the parsed tree, retaining executable LaTeX and code contents. */
+fun MarkdownDocument.copyPlainText(): String = blocks.joinToString("\n\n") { it.copyPlainText() }
+
+private fun MarkdownBlock.copyPlainText(): String = when (this) {
+    is MarkdownBlock.Paragraph -> content.copyPlainText()
+    is MarkdownBlock.Heading -> content.copyPlainText()
+    is MarkdownBlock.CodeBlock -> code
+    is MarkdownBlock.Quote -> children.joinToString("\n\n") { it.copyPlainText() }
+    is MarkdownBlock.Container -> children.joinToString("\n\n") { it.copyPlainText() }
+    is MarkdownBlock.Details -> summary.copyPlainText() + "\n" + children.joinToString("\n\n") { it.copyPlainText() }
+    is MarkdownBlock.ListBlock -> items.mapIndexed { index, item ->
+        val marker = if (ordered) "${start + index}. " else "• "
+        val checked = item.checked?.let { if (it) "[x] " else "[ ] " }.orEmpty()
+        marker + checked + item.children.joinToString("\n") { it.copyPlainText() }
+    }.joinToString("\n")
+    is MarkdownBlock.Table -> (listOf(header) + rows).joinToString("\n") { row ->
+        row.joinToString("\t") { it.content.copyPlainText() }
+    }
+    MarkdownBlock.Divider -> ""
+}
+
+private fun List<MarkdownInline>.copyPlainText(): String = joinToString("") {
+    when (it) {
+        is MarkdownInline.Text -> it.text
+        is MarkdownInline.Styled -> it.children.copyPlainText()
+        is MarkdownInline.Code -> it.code
+        is MarkdownInline.Link -> it.children.copyPlainText()
+        is MarkdownInline.Image -> it.alt.orEmpty()
+        is MarkdownInline.Math -> it.copySource()
+    }
+}
