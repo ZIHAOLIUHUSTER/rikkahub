@@ -2,6 +2,12 @@ package me.rerere.ui.webview
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.net.Uri
+import android.view.View
+import android.webkit.CookieManager
+import android.webkit.PermissionRequest
+import android.webkit.GeolocationPermissions
+import android.webkit.ValueCallback
 import android.util.Log
 import android.view.ViewGroup.LayoutParams
 import android.webkit.ConsoleMessage
@@ -27,6 +33,25 @@ import androidx.compose.ui.viewinterop.AndroidView
 private const val TAG = "WebView"
 
 internal class MyWebChromeClient(private val state: WebViewState) : WebChromeClient() {
+    override fun onPermissionRequest(request: PermissionRequest) {
+        if (state.isolatedContent) request.deny() else super.onPermissionRequest(request)
+    }
+
+    override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
+        if (state.isolatedContent) callback.invoke(origin, false, false)
+        else super.onGeolocationPermissionsShowPrompt(origin, callback)
+    }
+
+    override fun onShowFileChooser(
+        webView: WebView,
+        filePathCallback: ValueCallback<Array<Uri>>,
+        fileChooserParams: FileChooserParams,
+    ): Boolean {
+        if (!state.isolatedContent) return super.onShowFileChooser(webView, filePathCallback, fileChooserParams)
+        filePathCallback.onReceiveValue(null)
+        return true
+    }
+
     override fun onProgressChanged(view: WebView?, newProgress: Int) {
         state.loadingProgress = newProgress / 100f
     }
@@ -53,8 +78,14 @@ internal class MyWebViewClient(private val state: WebViewState) : WebViewClient(
         view: WebView,
         request: WebResourceRequest
     ): WebResourceResponse? {
+        if (state.isolatedContent) return blockedPreviewResponse()
         return WebViewLocalAssets.intercept(view.context.applicationContext, request.url)
             ?: super.shouldInterceptRequest(view, request)
+    }
+
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        // Generated pages cannot navigate into authenticated app/browser origins.
+        return state.isolatedContent
     }
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -88,6 +119,7 @@ private fun WebView.resetState(
 }
 
 private fun WebView.release(interfaces: Map<String, Any>) {
+    onPause()
     resetState(interfaces, clearClients = true)
     loadUrl("about:blank")
     clearHistory()
@@ -104,8 +136,8 @@ fun WebView(
     onUpdated: (WebView) -> Unit = {},
 ) {
     // Remember the clients based on the state
-    val webChromeClient = remember { MyWebChromeClient(state) }
-    val webViewClient = remember { MyWebViewClient(state) }
+    val webChromeClient = remember(state) { MyWebChromeClient(state) }
+    val webViewClient = remember(state) { MyWebViewClient(state) }
 
     Box(
         modifier = modifier
@@ -126,37 +158,49 @@ fun WebView(
                     settings.domStorageEnabled = true
                     settings.allowContentAccess = true
                     settings.apply(state.settings)
+                    if (state.isolatedContent) {
+                        settings.restrictGeneratedContent()
+                        importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
+                        removeJavascriptInterface("searchBoxJavaBridge_")
+                        removeJavascriptInterface("accessibility")
+                        removeJavascriptInterface("accessibilityTraversal")
+                        setDownloadListener { _, _, _, _, _ -> /* No generated-page downloads. */ }
+                    }
 
                     // Use the created clients
                     this.webChromeClient = webChromeClient
                     this.webViewClient = webViewClient
 
-                    state.interfaces.forEach { (name, obj) ->
+                    state.interfaces.takeUnless { state.isolatedContent }.orEmpty().forEach { (name, obj) ->
                         addJavascriptInterface(obj, name)
                     }
                 }
             },
             modifier = Modifier.fillMaxWidth(), // Make WebView fill the width
-            onReset = {
-                it.resetState(state.interfaces)
+            // Never pool generated pages with trusted app pages.
+            onReset = if (state.isolatedContent) null else { view ->
+                view.resetState(state.interfaces)
+                state.lastLoadedData = null
                 Log.d(TAG, "AndroidView: Resetting WebView")
             },
             onRelease = {
                 if (state.webView === it) {
                     state.webView = null
+                    state.lastLoadedData = null
                 }
                 it.release(state.interfaces)
                 Log.d(TAG, "AndroidView: Releasing WebView")
             },
             update = { webView ->
                 state.webView = webView
-                state.interfaces.forEach { (name, obj) ->
+                state.interfaces.takeUnless { state.isolatedContent }.orEmpty().forEach { (name, obj) ->
                     webView.addJavascriptInterface(obj, name)
                 }
                 Log.d(TAG, "AndroidView: Updating WebView")
                 // Ensure clients are updated if state changes (though unlikely here)
-                // webView.webChromeClient = webChromeClient
-                // webView.webViewClient = webViewClient
+                webView.webChromeClient = webChromeClient
+                webView.webViewClient = webViewClient
 
                 // Update settings that might change
                 webView.settings.javaScriptEnabled = state.javaScriptEnabled
@@ -228,7 +272,8 @@ sealed class WebContent {
 class WebViewState(
     initialContent: WebContent = WebContent.NavigatorOnly,
     val interfaces: Map<String, Any> = emptyMap(),
-    val settings: WebSettings.() -> Unit = {}
+    val settings: WebSettings.() -> Unit = {},
+    val isolatedContent: Boolean = false,
 ) {
     // --- Content State ---
     var content: WebContent by mutableStateOf(initialContent)
@@ -349,11 +394,13 @@ fun rememberWebViewState(
     mimeType: String? = null,
     historyUrl: String? = null,
     interfaces: Map<String, Any> = emptyMap(),
+    isolatedContent: Boolean = false,
     settings: WebSettings.() -> Unit = {},
-) = remember(data, baseUrl, encoding, mimeType, historyUrl) { // Use keys
+) = remember(data, baseUrl, encoding, mimeType, historyUrl, isolatedContent) { // Use keys
     WebViewState(
         initialContent = WebContent.Data(data, baseUrl, encoding, mimeType, historyUrl),
         interfaces = interfaces,
-        settings = settings
+        settings = settings,
+        isolatedContent = isolatedContent,
     )
 }

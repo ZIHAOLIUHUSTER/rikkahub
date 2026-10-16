@@ -78,9 +78,7 @@ import me.rerere.rikkahub.ui.theme.AtomOneLightPalette
 import me.rerere.rikkahub.ui.theme.JetbrainsMono
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
 import me.rerere.rikkahub.utils.toDp
-import me.rerere.ui.webview.WebView
 import me.rerere.ui.webview.WebViewContentCache
-import me.rerere.ui.webview.rememberWebViewState
 import kotlin.time.Clock
 
 private const val COLLAPSE_LINES = 10
@@ -92,6 +90,7 @@ fun HighlightCodeBlock(
     language: String,
     modifier: Modifier = Modifier,
     completeCodeBlock: Boolean = true,
+    isStreaming: Boolean = false,
     style: TextStyle? = TextStyle(
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -105,11 +104,15 @@ fun HighlightCodeBlock(
     val navController = LocalNavController.current
     val context = LocalContext.current
     val settings = LocalSettings.current
-    val normalizedLanguage = remember(language) { language.lowercase() }
+    val normalizedLanguage = remember(language) { language.trim().lowercase() }
     val canInlinePreview = completeCodeBlock && normalizedLanguage in PREVIEWABLE_LANGUAGES
-    var previewMode by remember(canInlinePreview, code, normalizedLanguage) {
-        mutableStateOf(false)
-    }
+    var manualPreview by remember(code, normalizedLanguage) { mutableStateOf<Boolean?>(null) }
+    val previewMode = canInlinePreview && (manualPreview ?: shouldAutoPreviewHtml(
+        language = normalizedLanguage,
+        completeCodeBlock = completeCodeBlock,
+        isStreaming = isStreaming,
+        enabled = settings.displaySetting.autoRenderHtml,
+    ))
 
     var isExpanded by remember(settings.displaySetting.codeBlockAutoCollapse) {
         mutableStateOf(!settings.displaySetting.codeBlockAutoCollapse)
@@ -156,7 +159,7 @@ fun HighlightCodeBlock(
                 previewMode = previewMode,
                 canInlinePreview = canInlinePreview,
                 onTogglePreviewMode = {
-                    previewMode = !previewMode
+                    manualPreview = !previewMode
                 },
             )
         }
@@ -169,8 +172,7 @@ fun HighlightCodeBlock(
                         code = code,
                         language = normalizedLanguage,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
+                            .fillMaxWidth(),
                     )
                 }
                 completeCodeBlock && normalizedLanguage == "mermaid" -> {
@@ -367,6 +369,7 @@ private fun HighlightCodeActions(
     onTogglePreviewMode: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val darkMode = LocalDarkMode.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -394,7 +397,7 @@ private fun HighlightCodeActions(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .onClick {
-                        val extension = when (language.lowercase()) {
+                        val extension = when (language.trim().lowercase()) {
                             "kotlin" -> "kt"
                             "java" -> "java"
                             "python" -> "py"
@@ -438,7 +441,7 @@ private fun HighlightCodeActions(
                     .size(iconSize)
             )
 
-            val normalizedLanguage = language.lowercase()
+            val normalizedLanguage = language.trim().lowercase()
             if (canInlinePreview) {
                 Icon(
                     imageVector = if (previewMode) HugeIcons.Code else HugeIcons.View,
@@ -462,47 +465,18 @@ private fun HighlightCodeActions(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .onClick {
-                            val content = buildCodePreviewHtml(code = code, language = normalizedLanguage)
+                            val content = me.rerere.ui.webview.isolateGeneratedHtml(
+                                buildCodePreviewHtml(code = code, language = normalizedLanguage),
+                                dark = darkMode,
+                            )
                             val contentId = WebViewContentCache.store(context.cacheDir, content)
-                            navController.navigate(Screen.WebView(contentId = contentId))
+                            navController.navigate(Screen.WebView(contentId = contentId, isolatedContent = true))
                         }
                         .padding(4.dp)
                         .size(iconSize)
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun CodeBlockPreview(
-    code: String,
-    language: String,
-    modifier: Modifier = Modifier,
-) {
-    val state = rememberWebViewState(
-        data = buildCodePreviewHtml(code = code, language = language),
-        baseUrl = "https://rikkahub.local",
-        mimeType = "text/html",
-        settings = {
-            builtInZoomControls = true
-            displayZoomControls = false
-            useWideViewPort = true
-            loadWithOverviewMode = true
-        }
-    )
-
-    WebView(
-        state = state,
-        modifier = modifier.clip(RoundedCornerShape(4.dp)),
-    )
-}
-
-private fun buildCodePreviewHtml(code: String, language: String): String {
-    return if (language == "svg") {
-        """<!DOCTYPE html><html><body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;">$code</body></html>"""
-    } else {
-        code
     }
 }
 

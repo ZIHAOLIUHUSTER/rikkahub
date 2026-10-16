@@ -431,7 +431,7 @@ class RouteActivity : ComponentActivity() {
                             }
 
                             entry<Screen.WebView> { key ->
-                                WebViewPage(key.url, key.contentId)
+                                WebViewPage(key.url, key.contentId, key.isolatedContent)
                             }
 
                             entry<Screen.SettingTheme> {
@@ -693,7 +693,7 @@ sealed interface Screen : NavKey {
     data class MediaCreation(val id: String) : Screen
 
     @Serializable
-    data class WebView(val url: String = "", val contentId: String = "") : Screen
+    data class WebView(val url: String = "", val contentId: String = "", val isolatedContent: Boolean = false) : Screen
 
     @Serializable
     data object SettingTheme : Screen

@@ -391,6 +391,7 @@ private fun MessagePartsBlock(
                                             scope = AssistantAffectScope.USER,
                                             visual = true,
                                         ),
+                                        isStreaming = loading,
                                         onClickCitation = handleClickCitation
                                     )
                                 }
@@ -407,6 +408,7 @@ private fun MessagePartsBlock(
                                                 scope = AssistantAffectScope.ASSISTANT,
                                                 visual = true,
                                             ),
+                                            isStreaming = loading,
                                             onClickCitation = handleClickCitation,
                                         )
                                     }
@@ -417,6 +419,7 @@ private fun MessagePartsBlock(
                                             scope = AssistantAffectScope.ASSISTANT,
                                             visual = true,
                                         ),
+                                        isStreaming = loading,
                                         onClickCitation = handleClickCitation,
                                         modifier = Modifier
                                             .animateContentSize()

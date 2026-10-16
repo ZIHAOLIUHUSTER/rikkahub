@@ -341,6 +341,12 @@ fun SettingPreferencesUIPage(vm: SettingVM = koinViewModel()) {
                     title = { Text(stringResource(R.string.setting_page_code_display_settings)) },
                 ) {
                     switchItem(
+                        checked = displaySetting.autoRenderHtml,
+                        onCheckedChange = { updateDisplaySetting(displaySetting.copy(autoRenderHtml = it)) },
+                        headlineContent = { Text("Automatically preview HTML") },
+                        supportingContent = { Text("Preview completed HTML blocks locally. External network and device access are blocked.") },
+                    )
+                    switchItem(
                         checked = displaySetting.codeBlockAutoWrap,
                         onCheckedChange = { updateDisplaySetting(displaySetting.copy(codeBlockAutoWrap = it)) },
                         supportingContent = { Text(stringResource(R.string.setting_display_page_code_block_auto_wrap_desc)) },

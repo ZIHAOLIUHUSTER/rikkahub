@@ -26,6 +26,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,7 +49,7 @@ import me.rerere.ui.webview.rememberWebViewState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WebViewPage(url: String, contentId: String) {
+fun WebViewPage(url: String, contentId: String, isolatedContent: Boolean = false) {
     val context = LocalContext.current
     val state = if (url.isNotEmpty()) {
         rememberWebViewState(
@@ -62,7 +66,8 @@ fun WebViewPage(url: String, contentId: String) {
         }
         rememberWebViewState(
             data = content,
-            baseUrl = WEB_VIEW_BASE_URL,
+            baseUrl = if (isolatedContent) me.rerere.ui.webview.ISOLATED_PREVIEW_ORIGIN else WEB_VIEW_BASE_URL,
+            isolatedContent = isolatedContent,
             mimeType = "text/html",
             settings = {
                 builtInZoomControls = true
@@ -71,6 +76,16 @@ fun WebViewPage(url: String, contentId: String) {
                 loadWithOverviewMode = true
             }
         )
+    }
+
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, state) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) state.webView?.onPause()
+            if (event == Lifecycle.Event.ON_RESUME) state.webView?.onResume()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
 
     var showDropdown by remember { mutableStateOf(false) }
