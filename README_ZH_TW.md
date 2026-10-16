@@ -71,7 +71,7 @@
 - [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) (Json序列化)
 
 > [!TIP]
-> 你需要在 `app` 資料夾下添加 `google-services.json` 檔案才能構建應用。
+> 此定製版本已移除 Firebase 使用統計與崩潰回報，構建不需要 `google-services.json`。
 
 ## 💰 捐贈
 

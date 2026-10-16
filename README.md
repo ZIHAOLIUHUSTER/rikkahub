@@ -78,7 +78,7 @@ Technology stack documentation:
 - [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) (JSON serialization)
 
 > [!TIP]
-> You need a `google-services.json` file at `app` folder to build the app.
+> This custom build removes Firebase analytics and crash reporting; `google-services.json` is not required.
 
 ## 💰 Donate
 
