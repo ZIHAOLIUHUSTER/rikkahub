@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FINAL_TAG: study-v2.5.6-1
-  ASSET_REF: codex/study-final-assets-194
+  FINAL_TAG: study-v2.5.6-2
+  ASSET_REF: codex/study-final-assets-195
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
         run: test "$(gh release view "$FINAL_TAG" --json isDraft --jq .isDraft)" = true
       - uses: actions/checkout@v4
         with:
-          ref: codex/study-final-assets-194
+          ref: codex/study-final-assets-195
           path: release-apks
       - name: Verify transported APK checksums
         run: cd release-apks && sha256sum --check SHA256SUMS.txt
@@ -54,7 +54,7 @@ jobs:
             "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" > signer.txt
             grep -q 'certificate SHA-256 digest: 4b15d75da0e4461dc24506fb53e2aaa156b72c34b59a3fec3d56356525842909' signer.txt
             "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" > badging.txt
-            grep -q "name='me.rerere.rikkahub.study' versionCode='194' versionName='2.5.6-study.3'" badging.txt
+            grep -q "name='me.rerere.rikkahub.study' versionCode='195' versionName='2.5.6-study.4'" badging.txt
             if grep -q 'application-debuggable' badging.txt; then exit 1; fi
           done
       - name: Install and launch the actual Release APK on Android 15
@@ -89,6 +89,11 @@ jobs:
           if grep -q 'Process: me.rerere.rikkahub.study,' crash.txt; then cat crash.txt; exit 1; fi
           adb shell screencap -p /sdcard/study-final-start.png
           adb pull /sdcard/study-final-start.png study-final-start.png
+          (cd release-apks/validation && sha256sum --check SHA256SUMS.txt)
+          adb install --no-streaming release-apks/validation/app-debug.apk
+          adb install --no-streaming release-apks/validation/app-androidTest.apk
+          adb shell am instrument -w -r -e class me.rerere.rikkahub.ui.components.message.RoleThoughtMessageTest me.rerere.rikkahub.study.debug.test/androidx.test.runner.AndroidJUnitRunner | tee role-thought-tests.txt
+          grep -Fq 'OK (4 tests)' role-thought-tests.txt
       - name: Summarize installation and startup
         if: always()
         run: |
@@ -98,6 +103,7 @@ jobs:
             if [ -f launch.txt ]; then cat launch.txt; fi
             if [ -f activity.txt ]; then grep -E '(mResumedActivity|topResumedActivity|ResumedActivity)' activity.txt || true; fi
             if [ -f crash.txt ]; then head -n 100 crash.txt; fi
+            if [ -f role-thought-tests.txt ]; then head -n 200 role-thought-tests.txt; fi
             if [ ! -f launch.txt ] && [ -f emulator.log ]; then tail -n 30 emulator.log; fi
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -114,6 +120,7 @@ jobs:
             signer.txt
             badging.txt
             study-final-start.png
+            role-thought-tests.txt
       - name: Publish verified final release
         run: |
           gh release upload "$FINAL_TAG" release-apks/*.apk release-apks/SHA256SUMS.txt
