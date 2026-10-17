@@ -14,6 +14,7 @@ concurrency:
 
 env:
   FINAL_TAG: study-v2.5.6-1
+  ASSET_REF: codex/study-final-assets-194
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -26,12 +27,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Download privately signed draft APKs
-        run: |
-          test "$(gh release view "$FINAL_TAG" --json isDraft --jq .isDraft)" = true
-          mkdir release-apks
-          gh release download "$FINAL_TAG" --pattern '*.apk' --pattern SHA256SUMS.txt --dir release-apks
-          (cd release-apks && sha256sum --check SHA256SUMS.txt)
+      - name: Check final release draft
+        run: test "$(gh release view "$FINAL_TAG" --json isDraft --jq .isDraft)" = true
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/study-final-assets-194
+          path: release-apks
+      - name: Verify transported APK checksums
+        run: cd release-apks && sha256sum --check SHA256SUMS.txt
       - name: Prepare Android emulator and APK tools
         run: |
           sdk_path="$RUNNER_TEMP/rikkahub-android-sdk"
@@ -113,4 +116,6 @@ jobs:
             study-final-start.png
       - name: Publish verified final release
         run: |
+          gh release upload "$FINAL_TAG" release-apks/*.apk release-apks/SHA256SUMS.txt
           gh release edit "$FINAL_TAG" --target "$GITHUB_SHA" --draft=false --prerelease=false --latest
+          gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$ASSET_REF"
