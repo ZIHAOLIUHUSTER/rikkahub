@@ -1,4 +1,4 @@
-name: Rich Content Preview
+name: Study Final Release
 
 on:
   push:
@@ -9,30 +9,30 @@ permissions:
   contents: write
 
 concurrency:
-  group: rich-content-preview
+  group: study-final-release
   cancel-in-progress: true
 
+env:
+  FINAL_TAG: study-v2.5.6-1
+  GH_TOKEN: ${{ github.token }}
+
 jobs:
-  build:
+  validate-and-publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.28.6
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-          cache-dependency-path: web-ui/pnpm-lock.yaml
-      - name: Prepare Android SDK
+      - name: Download privately signed draft APKs
+        run: |
+          test "$(gh release view "$FINAL_TAG" --json isDraft --jq .isDraft)" = true
+          mkdir release-apks
+          gh release download "$FINAL_TAG" --pattern '*.apk' --pattern SHA256SUMS.txt --dir release-apks
+          (cd release-apks && sha256sum --check SHA256SUMS.txt)
+      - name: Prepare Android emulator and APK tools
         run: |
           sdk_path="$RUNNER_TEMP/rikkahub-android-sdk"
           tools_zip="$RUNNER_TEMP/rikkahub-cmdline-tools.zip"
@@ -41,30 +41,24 @@ jobs:
           mkdir -p "$sdk_path/cmdline-tools"
           unzip -q "$tools_zip" -d "$sdk_path/cmdline-tools"
           mv "$sdk_path/cmdline-tools/cmdline-tools" "$sdk_path/cmdline-tools/latest"
-          "$sdk_path/cmdline-tools/latest/bin/android" --sdk="$sdk_path" sdk install 'platforms;android-37.0' 'platforms;android-37.2' 'build-tools;36.0.0' 'build-tools;37.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1' platform-tools
+          "$sdk_path/cmdline-tools/latest/bin/android" --sdk="$sdk_path" sdk install 'build-tools;37.0.0' emulator platform-tools 'system-images;android-35;google_apis;x86_64'
           echo "ANDROID_HOME=$sdk_path" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$sdk_path" >> "$GITHUB_ENV"
           echo "$sdk_path/platform-tools" >> "$GITHUB_PATH"
-      - name: Install frontend dependencies
-        working-directory: web-ui
-        run: pnpm install --frozen-lockfile
-      - name: Check frontend types
-        working-directory: web-ui
-        run: pnpm run typecheck
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Test UI and build signed preview APKs
-        run: >-
-          bash gradlew :ui:testDebugUnitTest :app:assembleDebug
-          --max-workers=2 --no-configuration-cache --console=plain
-          -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8'
-          -Pkotlin.compiler.execution.strategy=in-process
-      - name: Verify actual HTML rendering in Android WebView
-        timeout-minutes: 15
+      - name: Verify release identity and signatures
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/android" --sdk="$ANDROID_HOME" sdk install emulator 'system-images;android-35;google_apis;x86_64'
+          for apk in release-apks/*.apk; do
+            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" > signer.txt
+            grep -q 'certificate SHA-256 digest: 4b15d75da0e4461dc24506fb53e2aaa156b72c34b59a3fec3d56356525842909' signer.txt
+            "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$apk" > badging.txt
+            grep -q "name='me.rerere.rikkahub.study' versionCode='194' versionName='2.5.6-study.3'" badging.txt
+            if grep -q 'application-debuggable' badging.txt; then exit 1; fi
+          done
+      - name: Install and launch the actual Release APK on Android 15
+        run: |
           sudo chmod 666 /dev/kvm
-          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name rich-content-test --package 'system-images;android-35;google_apis;x86_64' --device pixel_7
-          "$ANDROID_HOME/emulator/emulator" -avd rich-content-test -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on -memory 2048 > emulator.log 2>&1 &
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name study-final-test --package 'system-images;android-35;google_apis;x86_64' --device pixel_7
+          "$ANDROID_HOME/emulator/emulator" -avd study-final-test -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on -memory 2048 > emulator.log 2>&1 &
           emulator_pid=$!
           trap 'kill "$emulator_pid" || true' EXIT
           timeout 300 adb wait-for-device
@@ -72,43 +66,39 @@ jobs:
           import subprocess, time
           deadline = time.monotonic() + 300
           while time.monotonic() < deadline:
-              result = subprocess.run(['adb', 'shell', 'getprop', 'sys.boot_completed'], capture_output=True, text=True, timeout=15)
-              if result.stdout.strip() == '1':
+              r = subprocess.run(['adb', 'shell', 'getprop', 'sys.boot_completed'], capture_output=True, text=True, timeout=15)
+              if r.stdout.strip() == '1':
                   break
               time.sleep(3)
           else:
               raise SystemExit('Android emulator did not complete boot')
           PYBOOT
           adb shell input keyevent 82
-          bash gradlew :ui:connectedDebugAndroidTest --max-workers=2 --no-configuration-cache --console=plain -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' -Pkotlin.compiler.execution.strategy=in-process
-      - name: Prepare APKs and checksums
-        run: |
-          mkdir -p dist
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk dist/RikkaHub-Study-arm64-v8a.apk
-          cp app/build/outputs/apk/debug/app-x86_64-debug.apk dist/RikkaHub-Study-x86_64.apk
-          cp app/build/outputs/apk/debug/app-universal-debug.apk dist/RikkaHub-Study-universal.apk
-          for apk in dist/*.apk; do
-            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify "$apk"
-          done
-          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          adb install --no-streaming release-apks/RikkaHub-Study-universal.apk
+          adb logcat -c
+          adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n me.rerere.rikkahub.study/me.rerere.rikkahub.RouteActivity | tee launch.txt
+          grep -q 'Status: ok' launch.txt
+          sleep 10
+          adb shell pidof me.rerere.rikkahub.study
+          adb shell dumpsys activity activities > activity.txt
+          grep -E '(mResumedActivity|topResumedActivity|ResumedActivity).*me.rerere.rikkahub.study/me.rerere.rikkahub.RouteActivity' activity.txt
+          adb logcat -d -b crash > crash.txt
+          if grep -q 'Process: me.rerere.rikkahub.study,' crash.txt; then cat crash.txt; exit 1; fi
+          adb shell screencap -p /sdcard/study-final-start.png
+          adb pull /sdcard/study-final-start.png study-final-start.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: rich-content-build-results
+          name: study-final-validation
           if-no-files-found: ignore
           path: |
-            dist/
-            ui/build/reports/tests/
-            ui/build/test-results/
-            ui/build/reports/androidTests/
-            ui/build/outputs/androidTest-results/
+            launch.txt
+            activity.txt
+            crash.txt
             emulator.log
-      - name: Publish preview release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: rich-content-v2.5.6-preview-${{ github.run_number }}
+            signer.txt
+            badging.txt
+            study-final-start.png
+      - name: Publish verified final release
         run: |
-          gh release create "$RELEASE_TAG" dist/*.apk dist/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'RikkaHub 学习版 · HTML 预览修复版' --prerelease \
-            --notes-file docs/development/rich-content-release-notes.md
+          gh release edit "$FINAL_TAG" --target "$GITHUB_SHA" --draft=false --prerelease=false --latest
