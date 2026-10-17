@@ -14,15 +14,15 @@ Arbitrary rendered selections do not map back to exact Markdown formatting spans
 
 ## HTML previews
 
-Preferences → code display settings → Automatically preview HTML controls the default. Only closed fences explicitly labelled `html` automatically preview, after message streaming finishes. SVG retains its manual preview behavior. Toolbar buttons still copy/save source, toggle source/preview, and open fullscreen.
+Preferences → code display settings → Automatically preview HTML controls the default. Only closed fences explicitly labelled `html` automatically preview, after message streaming finishes. Thinking content never previews HTML/SVG, including after thinking completes. SVG in normal answers retains its manual preview behavior. Toolbar buttons still copy/save source, toggle source/preview, and open fullscreen.
 
 Inline height follows measured page content, rounded to 4dp with a 96dp minimum, a 360dp collapsed limit and a 720dp expanded limit. Larger pages scroll inside the preview. Measurements run every 500ms only while the preview is visible and the activity resumed. At most two visible inline WebViews exist; excess previews show a paused placeholder and remain accessible fullscreen. Leaving the viewport or backgrounding destroys the inline WebView, so its transient JS/form state is reset when it returns. Fullscreen pauses/resumes with the activity.
 
-Generated HTML uses a separate origin and a restrictive CSP before authored scripts. Inline JavaScript, Canvas, SVG, data/blob images and local form interactions work; external scripts/styles/images, network requests, frames, workers, navigation, form submissions, file/content access, downloads, autofill, geolocation, camera/microphone permissions and Android JS interfaces are blocked. Pages requiring CDN libraries or remote resources need to be made self-contained. Existing trusted Mermaid and Markdown-export WebViews retain their asset support.
+Generated HTML is served unchanged by a local WebViewClient response at a separate origin. Only this main document receives a 200 response; other requests are blocked. A CSP response header applies isolation without parsing or rewriting HTML/SVG, theme CSS or viewport declarations. Original overview/zoom behavior is preserved. Inline JavaScript, Canvas, SVG, data/blob images and local form interactions work; external scripts/styles/images, network requests, frames, workers, navigation, form submissions, file/content access, downloads, autofill, geolocation, camera/microphone permissions and Android JS interfaces are blocked. Pages requiring CDN libraries or remote resources need to be made self-contained. Existing trusted Mermaid and Markdown-export WebViews retain their asset support.
 
 ## Validation
 
-Unit coverage includes Markdown parsing/copying, fenced HTML completion/streaming/setting gates, preserving local controls and scripts, and enforcing CSP order. Cloud validation logs are under `/workspace/.setup`; the final task report distinguishes Gradle checks, direct JUnit execution, and device checks.
+Unit coverage includes Markdown parsing/copying, fenced HTML completion/streaming/setting gates, thinking/streaming gates, plus real Android WebView tests for SVG, UTF-8, Canvas, slider/button interaction, tall content, document replacement, release on disposal and resource isolation. Cloud validation logs are under `/workspace/.setup`; the final task report distinguishes Gradle checks, direct JUnit execution, and device checks.
 
 On a device, verify:
 

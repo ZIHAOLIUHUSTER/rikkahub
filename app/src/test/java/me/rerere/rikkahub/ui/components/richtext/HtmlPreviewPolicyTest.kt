@@ -20,4 +20,13 @@ class HtmlPreviewPolicyTest {
             assertFalse(shouldAutoPreviewHtml(language, true, false, true))
         }
     }
+    @Test
+    fun `thinking content never previews even after thinking finishes`() {
+        assertFalse(shouldAutoPreviewHtml("html", true, false, true, isReasoning = true))
+        assertFalse(canPreviewCodeBlock("html", true, false, isReasoning = true))
+        assertFalse(canPreviewCodeBlock("svg", true, false, isReasoning = true))
+        assertFalse(canPreviewCodeBlock("html", true, true, isReasoning = false))
+        assertTrue(canPreviewCodeBlock("html", true, false, isReasoning = false))
+        assertTrue(canPreviewCodeBlock("svg", true, false, isReasoning = false))
+    }
 }

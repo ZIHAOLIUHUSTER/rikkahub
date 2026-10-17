@@ -82,7 +82,6 @@ import me.rerere.ui.webview.WebViewContentCache
 import kotlin.time.Clock
 
 private const val COLLAPSE_LINES = 10
-private val PREVIEWABLE_LANGUAGES = setOf("html", "svg")
 
 @Composable
 fun HighlightCodeBlock(
@@ -91,6 +90,7 @@ fun HighlightCodeBlock(
     modifier: Modifier = Modifier,
     completeCodeBlock: Boolean = true,
     isStreaming: Boolean = false,
+    isReasoning: Boolean = false,
     style: TextStyle? = TextStyle(
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -105,13 +105,19 @@ fun HighlightCodeBlock(
     val context = LocalContext.current
     val settings = LocalSettings.current
     val normalizedLanguage = remember(language) { language.trim().lowercase() }
-    val canInlinePreview = completeCodeBlock && normalizedLanguage in PREVIEWABLE_LANGUAGES
+    val canInlinePreview = canPreviewCodeBlock(
+        language = normalizedLanguage,
+        completeCodeBlock = completeCodeBlock,
+        isStreaming = isStreaming,
+        isReasoning = isReasoning,
+    )
     var manualPreview by remember(code, normalizedLanguage) { mutableStateOf<Boolean?>(null) }
     val previewMode = canInlinePreview && (manualPreview ?: shouldAutoPreviewHtml(
         language = normalizedLanguage,
         completeCodeBlock = completeCodeBlock,
         isStreaming = isStreaming,
         enabled = settings.displaySetting.autoRenderHtml,
+        isReasoning = isReasoning,
     ))
 
     var isExpanded by remember(settings.displaySetting.codeBlockAutoCollapse) {
@@ -155,7 +161,6 @@ fun HighlightCodeBlock(
                 code = code,
                 createDocumentLauncher = createDocumentLauncher,
                 navController = navController,
-                completeCodeBlock = completeCodeBlock,
                 previewMode = previewMode,
                 canInlinePreview = canInlinePreview,
                 onTogglePreviewMode = {
@@ -363,13 +368,11 @@ private fun HighlightCodeActions(
     code: String,
     createDocumentLauncher: ManagedActivityResultLauncher<String, Uri?>,
     navController: Navigator,
-    completeCodeBlock: Boolean = true,
     previewMode: Boolean = false,
     canInlinePreview: Boolean = false,
     onTogglePreviewMode: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val darkMode = LocalDarkMode.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -457,7 +460,7 @@ private fun HighlightCodeActions(
                 )
             }
 
-            if (completeCodeBlock && normalizedLanguage in PREVIEWABLE_LANGUAGES) {
+            if (canInlinePreview) {
                 Icon(
                     imageVector = HugeIcons.Eye,
                     contentDescription = stringResource(id = R.string.code_block_preview),
@@ -465,10 +468,7 @@ private fun HighlightCodeActions(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .onClick {
-                            val content = me.rerere.ui.webview.isolateGeneratedHtml(
-                                buildCodePreviewHtml(code = code, language = normalizedLanguage),
-                                dark = darkMode,
-                            )
+                            val content = buildCodePreviewHtml(code = code, language = normalizedLanguage)
                             val contentId = WebViewContentCache.store(context.cacheDir, content)
                             navController.navigate(Screen.WebView(contentId = contentId, isolatedContent = true))
                         }

@@ -78,7 +78,15 @@ internal class MyWebViewClient(private val state: WebViewState) : WebViewClient(
         view: WebView,
         request: WebResourceRequest
     ): WebResourceResponse? {
-        if (state.isolatedContent) return blockedPreviewResponse()
+        if (state.isolatedContent) {
+            val content = state.content
+            // The document itself is local content, not a blocked external request.
+            return if (request.isForMainFrame && request.url.toString() == ISOLATED_PREVIEW_ORIGIN && content is WebContent.Data) {
+                generatedHtmlResponse(content.data)
+            } else {
+                blockedPreviewResponse()
+            }
+        }
         return WebViewLocalAssets.intercept(view.context.applicationContext, request.url)
             ?: super.shouldInterceptRequest(view, request)
     }
@@ -219,13 +227,18 @@ fun WebView(
 
                     is WebContent.Data -> {
                         if (content != state.lastLoadedData || state.forceReload) {
-                            webView.loadDataWithBaseURL(
-                                content.baseUrl,
-                                content.data,
-                                content.mimeType,
-                                content.encoding,
-                                content.historyUrl
-                            )
+                            if (state.isolatedContent) {
+                                // Load through our local response instead of a synthetic data: URL.
+                                webView.loadUrl(ISOLATED_PREVIEW_ORIGIN)
+                            } else {
+                                webView.loadDataWithBaseURL(
+                                    content.baseUrl,
+                                    content.data,
+                                    content.mimeType,
+                                    content.encoding,
+                                    content.historyUrl
+                                )
+                            }
                             state.lastLoadedData = content
                             state.forceReload = false
                         }

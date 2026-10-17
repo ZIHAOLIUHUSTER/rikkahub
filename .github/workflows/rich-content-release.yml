@@ -58,6 +58,29 @@ jobs:
           --max-workers=2 --no-configuration-cache --console=plain
           -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8'
           -Pkotlin.compiler.execution.strategy=in-process
+      - name: Verify actual HTML rendering in Android WebView
+        timeout-minutes: 15
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/android" --sdk="$ANDROID_HOME" sdk install emulator 'system-images;android-35;google_apis;x86_64'
+          sudo chmod 666 /dev/kvm
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name rich-content-test --package 'system-images;android-35;google_apis;x86_64' --device pixel_7
+          "$ANDROID_HOME/emulator/emulator" -avd rich-content-test -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on -memory 2048 > emulator.log 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" || true' EXIT
+          timeout 300 adb wait-for-device
+          python3 - <<'PYBOOT'
+          import subprocess, time
+          deadline = time.monotonic() + 300
+          while time.monotonic() < deadline:
+              result = subprocess.run(['adb', 'shell', 'getprop', 'sys.boot_completed'], capture_output=True, text=True, timeout=15)
+              if result.stdout.strip() == '1':
+                  break
+              time.sleep(3)
+          else:
+              raise SystemExit('Android emulator did not complete boot')
+          PYBOOT
+          adb shell input keyevent 82
+          bash gradlew :ui:connectedDebugAndroidTest --max-workers=2 --no-configuration-cache --console=plain -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' -Pkotlin.compiler.execution.strategy=in-process
       - name: Prepare APKs and checksums
         run: |
           mkdir -p dist
@@ -77,6 +100,9 @@ jobs:
             dist/
             ui/build/reports/tests/
             ui/build/test-results/
+            ui/build/reports/androidTests/
+            ui/build/outputs/androidTest-results/
+            emulator.log
       - name: Publish preview release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -84,5 +110,5 @@ jobs:
         run: |
           gh release create "$RELEASE_TAG" dist/*.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'RikkaHub 学习版 · 独立安装预览版' --prerelease \
+            --title 'RikkaHub 学习版 · HTML 预览修复版' --prerelease \
             --notes-file docs/development/rich-content-release-notes.md

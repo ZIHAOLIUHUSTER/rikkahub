@@ -174,6 +174,8 @@ private fun ReasoningContent(
                     scope = AssistantAffectScope.ASSISTANT,
                     visual = true,
                 ),
+                isStreaming = loading,
+                isReasoning = true,
                 style = reasoningTextStyle,
                 modifier = Modifier.fillMaxSize(),
             )

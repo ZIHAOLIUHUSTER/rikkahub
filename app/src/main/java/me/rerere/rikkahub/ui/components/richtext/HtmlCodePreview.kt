@@ -24,10 +24,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
-import me.rerere.rikkahub.ui.theme.LocalDarkMode
 import me.rerere.ui.webview.ISOLATED_PREVIEW_ORIGIN
 import me.rerere.ui.webview.WebView
-import me.rerere.ui.webview.isolateGeneratedHtml
 import me.rerere.ui.webview.rememberWebViewState
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -41,10 +39,7 @@ private object HtmlPreviewBudget {
 @Composable
 internal fun CodeBlockPreview(code: String, language: String, modifier: Modifier = Modifier) {
     val density = LocalDensity.current.density
-    val dark = LocalDarkMode.current
-    val html = remember(code, language, dark) {
-        isolateGeneratedHtml(buildCodePreviewHtml(code, language), dark)
-    }
+    val html = remember(code, language) { buildCodePreviewHtml(code, language) }
     var visible by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     var contentHeight by remember(code) { mutableStateOf(200) }
@@ -81,10 +76,10 @@ internal fun CodeBlockPreview(code: String, language: String, modifier: Modifier
                     mimeType = "text/html",
                     isolatedContent = true,
                     settings = {
-                        builtInZoomControls = false
+                        builtInZoomControls = true
                         displayZoomControls = false
-                        useWideViewPort = false
-                        loadWithOverviewMode = false
+                        useWideViewPort = true
+                        loadWithOverviewMode = true
                         textZoom = 100
                     },
                 )

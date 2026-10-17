@@ -133,6 +133,7 @@ fun MarkdownBlock(
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
     isStreaming: Boolean = false,
+    isReasoning: Boolean = false,
     onClickCitation: (String) -> Unit = {},
 ) {
     val enableLatexRendering = LocalSettings.current.displaySetting.enableLatexRendering
@@ -154,7 +155,7 @@ fun MarkdownBlock(
     }
 
     val currentOnClickCitation by rememberUpdatedState(onClickCitation)
-    val components = remember(enableLatexRendering, isStreaming) {
+    val components = remember(enableLatexRendering, isStreaming, isReasoning) {
         MarkdownComponents(
             codeBlock = { block ->
                 HighlightCodeBlock(
@@ -163,6 +164,7 @@ fun MarkdownBlock(
                     modifier = Modifier.fillMaxWidth(),
                     completeCodeBlock = block.closed,
                     isStreaming = isStreaming,
+                    isReasoning = isReasoning,
                 )
             },
             image = { image, _ ->
