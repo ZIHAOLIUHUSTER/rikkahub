@@ -91,7 +91,7 @@ jobs:
           adb pull /sdcard/study-final-start.png study-final-start.png
           (cd release-apks/validation && sha256sum --check SHA256SUMS.txt)
           adb install --no-streaming release-apks/validation/app-debug.apk
-          adb install --no-streaming release-apks/validation/app-androidTest.apk
+          adb install -t --no-streaming release-apks/validation/app-androidTest.apk
           adb shell am instrument -w -r -e class me.rerere.rikkahub.ui.components.message.RoleThoughtMessageTest me.rerere.rikkahub.study.debug.test/androidx.test.runner.AndroidJUnitRunner | tee role-thought-tests.txt
           grep -Fq 'OK (4 tests)' role-thought-tests.txt
       - name: Summarize installation and startup
