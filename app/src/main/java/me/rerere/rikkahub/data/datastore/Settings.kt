@@ -144,6 +144,7 @@ data class DisplaySetting(
     val showTokenUsage: Boolean = true,
     val showThinkingContent: Boolean = true,
     val autoCloseThinking: Boolean = true,
+    // Retained for existing settings/backup compatibility; app updates are no longer checked.
     val updateCheckDisabledUntilEpochMillis: Long = 0L,
     val showMessageJumper: Boolean = true,
     val messageJumperOnLeft: Boolean = false,
