@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -164,6 +165,7 @@ fun ChatMessage(
         }
         ProvideTextStyle(textStyle) {
             MessagePartsBlock(
+                messageId = message.id.toString(),
                 assistant = assistant,
                 role = message.role,
                 parts = message.parts,
@@ -271,6 +273,7 @@ fun ChatMessage(
 @OptIn(FlowPreview::class)
 @Composable
 private fun MessagePartsBlock(
+    messageId: String,
     assistant: Assistant?,
     role: MessageRole,
     model: Model?,
@@ -379,6 +382,29 @@ private fun MessagePartsBlock(
                             scope = if (role == MessageRole.USER) AssistantAffectScope.USER else AssistantAffectScope.ASSISTANT,
                             visual = true,
                         )
+                        val thoughtDocument = if (role == MessageRole.ASSISTANT && settings.displaySetting.autoCollapseRoleThoughts) {
+                            rememberRoleThoughtDocument(displayedText, messageId)
+                        } else null
+                        // Keep expansion across streaming -> selectable text; reset on branch/regeneration.
+                        val expandedThoughts = remember(messageId) { mutableStateMapOf<Int, String>() }
+                        val assistantText: @Composable (Modifier) -> Unit = { textModifier ->
+                            if (thoughtDocument != null) {
+                                RoleThoughtMessage(
+                                    document = thoughtDocument,
+                                    expandedThoughts = expandedThoughts,
+                                    isStreaming = loading,
+                                    onClickCitation = handleClickCitation,
+                                    modifier = textModifier,
+                                )
+                            } else {
+                                MarkdownBlock(
+                                    content = displayedText,
+                                    isStreaming = loading,
+                                    onClickCitation = handleClickCitation,
+                                    modifier = textModifier,
+                                )
+                            }
+                        }
                         val textContent = @Composable {
                             if (role == MessageRole.USER) {
                                 ChatMessageBubble(
@@ -403,20 +429,10 @@ private fun MessagePartsBlock(
                                         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = settings.displaySetting.bubbleOpacity),
                                         modifier = Modifier.animateContentSize(),
                                     ) {
-                                        MarkdownBlock(
-                                            content = displayedText,
-                                            isStreaming = loading,
-                                            onClickCitation = handleClickCitation,
-                                        )
+                                        assistantText(Modifier)
                                     }
                                 } else {
-                                    MarkdownBlock(
-                                        content = displayedText,
-                                        isStreaming = loading,
-                                        onClickCitation = handleClickCitation,
-                                        modifier = Modifier
-                                            .animateContentSize()
-                                    )
+                                    assistantText(Modifier.animateContentSize())
                                 }
                             }
                         }

@@ -1,0 +1,6 @@
+<resources>
+    <string name="role_thought_title">角色心声</string>
+    <string name="role_thought_copy">复制心声（Markdown）</string>
+    <string name="setting_auto_collapse_role_thoughts">自动折叠角色心声</string>
+    <string name="setting_auto_collapse_role_thoughts_desc">将助手回复中的 &lt;心声&gt;…&lt;/心声&gt; 显示为原生折叠卡片。请关闭旧的隐藏心声正则规则，以免心声在渲染前被替换。</string>
+</resources>

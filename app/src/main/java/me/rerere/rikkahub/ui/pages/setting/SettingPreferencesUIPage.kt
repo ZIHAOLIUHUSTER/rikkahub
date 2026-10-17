@@ -206,6 +206,12 @@ fun SettingPreferencesUIPage(vm: SettingVM = koinViewModel()) {
                         headlineContent = { Text(stringResource(R.string.setting_display_page_auto_collapse_thinking_title)) },
                     )
                     switchItem(
+                        checked = displaySetting.autoCollapseRoleThoughts,
+                        onCheckedChange = { updateDisplaySetting(displaySetting.copy(autoCollapseRoleThoughts = it)) },
+                        headlineContent = { Text(stringResource(R.string.setting_auto_collapse_role_thoughts)) },
+                        supportingContent = { Text(stringResource(R.string.setting_auto_collapse_role_thoughts_desc)) },
+                    )
+                    switchItem(
                         checked = displaySetting.enableLatexRendering,
                         onCheckedChange = { updateDisplaySetting(displaySetting.copy(enableLatexRendering = it)) },
                         supportingContent = { Text(stringResource(R.string.setting_display_page_enable_latex_rendering_desc)) },

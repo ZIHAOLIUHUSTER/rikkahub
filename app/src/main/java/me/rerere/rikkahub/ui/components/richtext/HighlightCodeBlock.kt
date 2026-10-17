@@ -91,6 +91,7 @@ fun HighlightCodeBlock(
     completeCodeBlock: Boolean = true,
     isStreaming: Boolean = false,
     isReasoning: Boolean = false,
+    allowCodePreview: Boolean = true,
     style: TextStyle? = TextStyle(
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -105,7 +106,7 @@ fun HighlightCodeBlock(
     val context = LocalContext.current
     val settings = LocalSettings.current
     val normalizedLanguage = remember(language) { language.trim().lowercase() }
-    val canInlinePreview = canPreviewCodeBlock(
+    val canInlinePreview = allowCodePreview && canPreviewCodeBlock(
         language = normalizedLanguage,
         completeCodeBlock = completeCodeBlock,
         isStreaming = isStreaming,
@@ -180,7 +181,7 @@ fun HighlightCodeBlock(
                             .fillMaxWidth(),
                     )
                 }
-                completeCodeBlock && normalizedLanguage == "mermaid" -> {
+                allowCodePreview && completeCodeBlock && normalizedLanguage == "mermaid" -> {
                     Mermaid(
                         code = code,
                         modifier = Modifier.fillMaxWidth(),
